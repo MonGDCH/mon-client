@@ -1,4 +1,5 @@
 <?php
+
 namespace mon\client;
 
 use mon\client\hook\UdpHook;
@@ -14,25 +15,25 @@ class Udp
      *
      * @var array
      */
-    private static $config = [];
+    protected static $config = [];
 
     /**
      * 缓存已请求的server配置
      *
      * @var array
      */
-    private static $requestCache = [];
+    protected static $requestCache = [];
 
     /**
      * 发送TCP请求
      *
      * @param string  $ip       IP
-     * @param int     $port     端口
+     * @param integer $port     端口
      * @param string  $cmd      请求命令套接字
      * @param integer $timeOut  超时时间
      * @param boolean $toJson   是否转换JSON数组为数组
      * @param boolean $close    是否关闭链接
-     * @return void
+     * @return mixed 结果集
      */
     public static function sendTCP($ip, $port, $cmd, $timeOut = 2, $toJson = false, $close = true)
     {
@@ -44,14 +45,14 @@ class Udp
      *
      * @param   string  $serverName 配置文件中对应节点名
      * @param   string  $cmd        请求命令套接字
-     * @param   int     $timeOut    请求超时时间
+     * @param   integer $timeOut    请求超时时间
      * @param   boolean $toJson     是否转换JSON数组为数组
      * @param   boolean $close      是否关闭链接
-     * @param   bool    $cache      是否读取缓存数据
-     * @param   int     $cacheTime  缓存数据有效时间
-     * @return  $result;
+     * @param   boolean $cache      是否读取缓存数据
+     * @param   integer $cacheTime  缓存数据有效时间
+     * @return  mixed 结果集
      */
-    public static function excuteCMD($serverName, $cmd, $timeOut = 2, $toJson = false, $close = true, $cache = false, $cacheTime = 60)
+    public static function sendCMD($serverName, $cmd, $timeOut = 2, $toJson = false, $close = true, $cache = false, $cacheTime = 60)
     {
         $server = self::getServer($serverName);
         if (empty($server)) {
@@ -75,6 +76,7 @@ class Udp
      * 设置CMD配置
      *
      * @param array $config 配置信息
+     * @return array CMD配置信息
      */
     public static function setConfig(array $config)
     {
@@ -87,7 +89,7 @@ class Udp
      * 获取IP地址端口
      *
      * @param string $serverName 配置文件对应服务名
-     * @return array
+     * @return array 服务信息
      */
     public static function getServer($serverName)
     {
@@ -122,7 +124,7 @@ class Udp
     /**
      * 获取配置文件配置信息
      *
-     * @return [type] [description]
+     * @return array
      */
     public static function getConfig()
     {
@@ -138,11 +140,12 @@ class Udp
      * 错误返回,抛出错误
      *
      * @param string $msg 错误提示信息
-     * @return Error
+     * @throws UdpException UDP异常
+     * @return void
      */
-    private static function errorQuit($msg = "")
+    protected static function errorQuit($msg = "")
     {
-        $msg = !empty($msg) ? $msg : "HTTP请求异常";
+        $msg = !empty($msg) ? $msg : "UDP请求异常";
         // 抛出错误
         throw new UdpException($msg);
     }
@@ -151,19 +154,19 @@ class Udp
      * 发送UDP请求
      *
      * @param string  $ip       IP
-     * @param int     $port     端口
+     * @param integer $port     端口
      * @param string  $cmd      请求命令套接字
      * @param integer $timeOut  超时时间
      * @param boolean $toJson   是否转换JSON数组为数组
      * @param boolean $close    是否关闭链接
-     * @return void
+     * @return mixed 结果集
      */
     protected static function send($ip, $port, $cmd, $timeOut = 2, $toJson = false, $close = true)
     {
         $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
         if (!$socket) {
             // 执行创建Socket失败钩子
-            UdpHook::listen('create_faild', ['error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
+            UdpHook::listen('create_faild', ['tag' => 'create_faild', 'error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
             return self::errorQuit('创建Socket失败');
         }
         $timeouter = ['sec' => $timeOut, 'usec' => 0];
@@ -171,20 +174,20 @@ class Udp
         socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, $timeouter);
         if (socket_connect($socket, $ip, $port) == false) {
             // 执行链接Socket失败钩子
-            UdpHook::listen('connect_faild', ['error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
+            UdpHook::listen('connect_faild', ['tag' => 'connect_faild', 'error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
             return self::errorQuit('链接Socket失败');
         }
         $send_len = strlen($cmd);
         $sent = socket_write($socket, $cmd, $send_len);
         if ($sent != $send_len) {
             // 执行发送CMD指令失败钩子
-            UdpHook::listen('sned_faild', ['error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
+            UdpHook::listen('sned_faild', ['tag' => 'sned_faild', 'error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
             return self::errorQuit('发送CMD指令失败');;
         }
         // 读取返回数据
         $data = socket_read($socket, 1024);
         // 执行结束，执行读取数据钩子
-        UdpHook::listen('send_after', ['response' => $data, 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
+        UdpHook::listen('send_after', ['tag' => 'send_after', 'response' => $data, 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
 
         // 是否转换Json格式
         $result = $toJson ? json_decode($data, true) : $data;
@@ -194,7 +197,7 @@ class Udp
         }
 
         // 执行返回结果集钩子
-        HttpHook::listen('result_return', ['response' => $data, 'result' => $result]);
+        UdpHook::listen('result_return', ['tag' => 'result_return', 'response' => $data, 'result' => $result]);
         return $result;
     }
 }

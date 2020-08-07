@@ -26,6 +26,6 @@ HttpHook::add('send_after', Hook::class);
 HttpHook::add('send_faild', Hook::class);
 HttpHook::add('result_return', Hook::class);
 
-$res = Http::excuteUrl('http://domain.com/admin/passport/login', ['a' => '123']);
+$res = Http::sendUrl('http://domain.com/admin/passport/login', ['a' => '123']);
 
 var_dump($res);

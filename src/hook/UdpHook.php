@@ -1,4 +1,5 @@
 <?php
+
 namespace mon\client\hook;
 
 use mon\client\hook\Hook;
