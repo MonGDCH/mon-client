@@ -7,24 +7,57 @@ use mon\client\exception\HttpException;
 
 /**
  * HTTP请求类
+ * 单个HTTP请求发起，IO阻塞
  * 
  * @version 2.0.0   支持GET、POST、PUT、DELETE请求类型
  */
 class Http
 {
     /**
+     * 单例实体
+     *
+     * @var null
+     */
+    protected static $instance = null;
+
+    /**
      * 配置信息
      *
      * @var array
      */
-    protected static $config = [];
+    protected $config = [];
 
     /**
      * 缓存已请求的server配置
      *
      * @var array
      */
-    protected static $requestCache = [];
+    protected $requestCache = [];
+
+    /**
+     * 单例实现
+     *
+     * @param array $config 配置信息
+     * @return Http
+     */
+    public static function instance(array $config = [])
+    {
+        if (is_null(self::$instance)) {
+            self::$instance = new static($config);
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * 私有化构造方法
+     *
+     * @param array $config 配置信息
+     */
+    protected function __construct(array $config = [])
+    {
+        $this->config = $config;
+    }
 
     /**
      * HTTP以URL的形式发送请求
@@ -37,18 +70,18 @@ class Http
      * @param   array   $header  请求头
      * @return  mixed 结果集
      */
-    public static function sendUrl($url, array $data = [], $type = 'GET', $toJson = false, $timeOut = 2, array $header = [])
+    public function sendUrl($url, array $data = [], $type = 'GET', $toJson = false, $timeOut = 2, array $header = [])
     {
         $method = strtoupper($type);
         $queryData = $data;
         // get请求
         if (count($data) > 0 && $method == 'GET') {
-            $uri = self::arrToUri($data);
+            $uri = $this->arrToUri($data);
             $url = $url . $uri;
             $queryData = [];
         }
 
-        return self::sendRquest($url, $queryData, $method, $toJson, $timeOut, $header);
+        return $this->sendRquest($url, $queryData, $method, $toJson, $timeOut, $header);
     }
 
     /**
@@ -64,22 +97,22 @@ class Http
      * @param   integer $cacheTime  缓存数据有效时间
      * @return  mixed   结果集
      */
-    public static function sendCMD($serverName, $data = [], $type = "GET", $toJson = false, $timeOut = 2, array $header = [], $cache = false, $cacheTime = 60)
+    public function sendCMD($serverName, $data = [], $type = "GET", $toJson = false, $timeOut = 2, array $header = [], $cache = false, $cacheTime = 60)
     {
-        $server = self::getServer($serverName);
+        $server = $this->getServer($serverName);
         if (empty($server)) {
             $errorMsg = "未能成功创建[ " . $serverName . " ]访问节点";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
         // 判断是否允许获取缓存数据
         if ($cache && !empty($server['chche']) && (time() - $server['time']) <= $cacheTime) {
             return $server['cache'];
         }
         // 发起请求
-        $result = self::sendUrl($server['url'], $data, $type, $toJson, $timeOut, $header);
+        $result = $this->sendUrl($server['url'], $data, $type, $toJson, $timeOut, $header);
         // 缓存数据
-        self::$requestCache[$serverName]['cache'] = $result;
-        self::$requestCache[$serverName]['time'] = time();
+        $this->requestCache[$serverName]['cache'] = $result;
+        $this->requestCache[$serverName]['time'] = time();
 
         return $result;
     }
@@ -90,13 +123,13 @@ class Http
      * @param array $data 一维数组
      * @return string uri
      */
-    public static function arrToUri($data)
+    public function arrToUri($data)
     {
         $ds = "&";
         $result = "";
         if (count($data) < 1) {
             $errorMsg = "[" . __METHOD__ . "]未能成功转换数组为URI";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
         foreach ($data as $key => $value) {
             $result = $result . $ds . trim($key) . "=" . trim($value);
@@ -111,33 +144,33 @@ class Http
      * @param string $serverName 配置文件对应服务名
      * @return array
      */
-    public static function getServer($serverName)
+    public function getServer($serverName)
     {
         // 判断是否存在请求缓存
-        if (!empty(self::$requestCache[$serverName])) {
-            return self::$requestCache[$serverName];
+        if (!empty($this->requestCache[$serverName])) {
+            return $this->requestCache[$serverName];
         }
-        if (empty(self::$config)) {
-            self::getConfig();
+        if (empty($this->config)) {
+            $this->getConfig();
         }
         // 判断配置文件中是否存在对应节点
-        if (empty(self::$config[$serverName])) {
+        if (empty($this->config[$serverName])) {
             $errorMsg = "配置文件未设置对应节点";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
         // 创建请求地址实例，缓存实例
-        $num  = self::$config[$serverName]['num'];
-        $port = self::$config[$serverName]['port'];
+        $num  = $this->config[$serverName]['num'];
+        $port = $this->config[$serverName]['port'];
         $rand = ($num > 0) ? mt_rand(0, $num - 1) : 0;
-        $ip   = self::$config[$serverName]['ip' . $rand];
+        $ip   = $this->config[$serverName]['ip' . $rand];
         // 缓存
-        self::$requestCache[$serverName] = [
+        $this->requestCache[$serverName] = [
             "url"   => "http://{$ip}:{$port}/",
             "cache" => '',
             "time"  => time(),
         ];
 
-        return self::$requestCache[$serverName];
+        return $this->requestCache[$serverName];
     }
 
     /**
@@ -146,11 +179,11 @@ class Http
      * @param array $config 配置信息
      * @return array 配置信息
      */
-    public static function setConfig(array $config)
+    public function setConfig(array $config)
     {
-        self::$config = array_merge(self::$config, $config);
+        $this->config = array_merge($this->config, $config);
 
-        return self::$config;
+        return $this->config;
     }
 
     /**
@@ -158,14 +191,14 @@ class Http
      *
      * @return array 配置信息
      */
-    public static function getConfig()
+    public function getConfig()
     {
-        if (empty(self::$config)) {
+        if (empty($this->config)) {
             $errorMsg = "配置信息不能为空";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
 
-        return self::$config;
+        return $this->config;
     }
 
     /**
@@ -175,7 +208,7 @@ class Http
      * @throws HttpException HTTP异常
      * @return void
      */
-    protected static function errorQuit($msg = "")
+    protected function errorQuit($msg = "")
     {
         $msg = !empty($msg) ? $msg : "HTTP请求异常";
         // 抛出错误
@@ -193,10 +226,10 @@ class Http
      * @param  array   $header  请求头
      * @return mixed 结果集
      */
-    protected static function sendRquest($url,  $data = [], $type = 'GET', $toJson = false, $timeOut = 0, array $header = [])
+    protected function sendRquest($url, $data = [], $type = 'GET', $toJson = false, $timeOut = 2, array $header = [])
     {
         // 判断是否为https请求
-        $ssl = strtolower(substr($url, 0, 8)) == "https://" ? TRUE : FALSE;
+        $ssl = strtolower(substr($url, 0, 8)) == "https://" ? true : false;
         $ch = curl_init();
         // 设置请求URL
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -215,19 +248,24 @@ class Http
             case "DELETE":
                 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
                 break;
+            default:
+                return $this->errorQuit('[' . __METHOD__ . ']不支持的请求类型(' . $type . ')');
         }
         // 判断是否需要传递数据
-        if (count($data) != 0) {
+        if (!empty($data)) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         }
         // 设置超时时间
-        if (!empty($timeOut)) {
+        if ($timeOut > 0) {
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeOut);
         }
         // 设置内容以文本形式返回，而不直接返回
         curl_setopt($ch, CURLOPT_HEADER, false);
         curl_setopt($ch, CURLOPT_VERBOSE, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        // 防止无限重定向
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 6);
         // 设置user-agent
         $userAgent = (isset($_SERVER['HTTP_USER_AGENT']) && !empty($_SERVER['HTTP_USER_AGENT'])) ? $_SERVER['HTTP_USER_AGENT'] : "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36";
         curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);

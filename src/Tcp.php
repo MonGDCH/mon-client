@@ -11,18 +11,50 @@ use mon\client\exception\TcpException;
 class Tcp
 {
     /**
+     * 单例实体
+     *
+     * @var null
+     */
+    protected static $instance = null;
+
+    /**
      * 配置信息
      *
      * @var array
      */
-    protected static $config = [];
+    protected $config = [];
 
     /**
      * 缓存已请求的server配置
      *
      * @var array
      */
-    protected static $requestCache = [];
+    protected $requestCache = [];
+
+    /**
+     * 单例实现
+     *
+     * @param array $config 配置信息
+     * @return Tcp
+     */
+    public static function instance(array $config = [])
+    {
+        if (is_null(self::$instance)) {
+            self::$instance = new static($config);
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * 私有化构造方法
+     *
+     * @param array $config 配置信息
+     */
+    protected function __construct(array $config = [])
+    {
+        $this->config = $config;
+    }
 
     /**
      * 发送TCP请求
@@ -35,9 +67,9 @@ class Tcp
      * @param boolean $close    是否关闭链接
      * @return mixed 结果集
      */
-    public static function sendTCP($ip, $port, $cmd, $timeOut = 2, $toJson = false, $close = true)
+    public function sendTCP($ip, $port, $cmd, $timeOut = 2, $toJson = false, $close = true)
     {
-        return self::send($ip, $port, $cmd, $timeOut, $toJson, $close);
+        return $this->send($ip, $port, $cmd, $timeOut, $toJson, $close);
     }
 
     /**
@@ -52,22 +84,22 @@ class Tcp
      * @param   integer $cacheTime  缓存数据有效时间
      * @return  $result;
      */
-    public static function sendCMD($serverName, $cmd, $timeOut = 2, $toJson = false, $close = true, $cache = false, $cacheTime = 60)
+    public function sendCMD($serverName, $cmd, $timeOut = 2, $toJson = false, $close = true, $cache = false, $cacheTime = 60)
     {
-        $server = self::getServer($serverName);
+        $server = $this->getServer($serverName);
         if (empty($server)) {
             $errorMsg = "未能成功创建[ " . $serverName . " ]访问节点";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
         // 判断是否允许获取缓存数据
         if ($cache && !empty($server['chche']) && (time() - $server['time']) <= $cacheTime) {
             return $server['cache'];
         }
         // CMD请求
-        $result = self::send($server['ip'], $server['port'], $cmd, $timeOut, $toJson, $close);
+        $result = $this->send($server['ip'], $server['port'], $cmd, $timeOut, $toJson, $close);
         // 缓存数据
-        self::$requestCache[$serverName]['cache'] = $result;
-        self::$requestCache[$serverName]['time'] = time();
+        $this->requestCache[$serverName]['cache'] = $result;
+        $this->requestCache[$serverName]['time'] = time();
 
         return $result;
     }
@@ -78,11 +110,11 @@ class Tcp
      * @param array $config 配置信息
      * @return array CMD配置信息
      */
-    public static function setConfig(array $config)
+    public function setConfig(array $config)
     {
-        self::$config = array_merge(self::$config, $config);
+        $this->config = array_merge($this->config, $config);
 
-        return self::$config;
+        return $this->config;
     }
 
     /**
@@ -91,34 +123,34 @@ class Tcp
      * @param string $serverName 配置文件对应服务名
      * @return array 服务信息
      */
-    public static function getServer($serverName)
+    public function getServer($serverName)
     {
         // 判断是否存在请求缓存
-        if (!empty(self::$requestCache[$serverName])) {
-            return self::$requestCache[$serverName];
+        if (!empty($this->requestCache[$serverName])) {
+            return $this->requestCache[$serverName];
         }
-        if (empty(self::$config)) {
-            self::getConfig();
+        if (empty($this->config)) {
+            $this->getConfig();
         }
         // 判断配置文件中是否存在对应节点
-        if (empty(self::$config[$serverName])) {
+        if (empty($this->config[$serverName])) {
             $errorMsg = "配置文件未设置对应节点";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
         // 创建请求地址实例，缓存实例
-        $num  = self::$config[$serverName]['num'];
-        $port = self::$config[$serverName]['port'];
+        $num  = $this->config[$serverName]['num'];
+        $port = $this->config[$serverName]['port'];
         $rand = ($num > 0) ? mt_rand(0, $num - 1) : 0;
-        $ip   = self::$config[$serverName]['ip' . $rand];
+        $ip   = $this->config[$serverName]['ip' . $rand];
         // 缓存
-        self::$requestCache[$serverName] = [
+        $this->requestCache[$serverName] = [
             "ip"    => $ip,
             "port"  => $port,
             "cache" => '',
             "time"  => time(),
         ];
 
-        return self::$requestCache[$serverName];
+        return $this->requestCache[$serverName];
     }
 
     /**
@@ -126,14 +158,14 @@ class Tcp
      *
      * @return array
      */
-    public static function getConfig()
+    public function getConfig()
     {
-        if (empty(self::$config)) {
+        if (empty($this->config)) {
             $errorMsg = "配置信息不能为空";
-            self::errorQuit($errorMsg);
+            return $this->errorQuit($errorMsg);
         }
 
-        return self::$config;
+        return $this->config;
     }
 
     /**
@@ -143,7 +175,7 @@ class Tcp
      * @throws TcpException TCP异常
      * @return void
      */
-    protected static function errorQuit($msg = "")
+    protected function errorQuit($msg = "")
     {
         $msg = !empty($msg) ? $msg : "TCP请求异常";
         // 抛出错误
@@ -161,13 +193,13 @@ class Tcp
      * @param boolean $close    是否关闭链接
      * @return mixed 结果集
      */
-    protected static function send($ip, $port, $cmd, $timeOut = 2, $toJson = false, $close = true)
+    protected function send($ip, $port, $cmd, $timeOut = 2, $toJson = false, $close = true)
     {
         $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
         if (!$socket) {
             // 执行创建Socket失败钩子
             TcpHook::listen('create_faild', ['tag' => 'create_faild', 'error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
-            return self::errorQuit('创建Socket失败');
+            return $this->errorQuit('创建Socket失败');
         }
         $timeouter = ['sec' => $timeOut, 'usec' => 0];
         socket_set_option($socket, SOL_SOCKET, SO_SNDTIMEO, $timeouter);
@@ -175,14 +207,14 @@ class Tcp
         if (socket_connect($socket, $ip, $port) == false) {
             // 执行链接Socket失败钩子
             TcpHook::listen('connect_faild', ['tag' => 'connect_faild', 'error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
-            return self::errorQuit('链接Socket失败');
+            return $this->errorQuit('链接Socket失败');
         }
         $send_len = strlen($cmd);
         $sent = socket_write($socket, $cmd, $send_len);
         if ($sent != $send_len) {
             // 执行发送CMD指令失败钩子
             TcpHook::listen('sned_faild', ['tag' => 'sned_faild', 'error' => socket_strerror(socket_last_error()), 'cmd' => $cmd, 'ip' => $ip, 'port' => $port]);
-            return self::errorQuit('发送CMD指令失败');;
+            return $this->errorQuit('发送CMD指令失败');;
         }
         // 读取返回数据
         $data = socket_read($socket, 1024);
