@@ -34,17 +34,6 @@ class HttpMulti
      */
     protected $requestCache = [];
 
-    protected $queryList = [
-        [
-            'url'       => 'http://localhost',
-            'data'      => [],
-            'method'    => 'post',
-            'timeout'   => 2,
-            'header'    => [],
-            'callback'  => null,
-        ]
-    ];
-
     /**
      * 私有化构造方法
      *
@@ -59,7 +48,7 @@ class HttpMulti
      * 单例实现
      *
      * @param array $config 配置信息
-     * @return HttoMulti
+     * @return HttpMulti
      */
     public static function instance(array $config = [])
     {
