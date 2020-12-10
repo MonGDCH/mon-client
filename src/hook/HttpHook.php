@@ -6,6 +6,9 @@ use mon\client\hook\Hook;
 
 /**
  * HTTP业务钩子
+ * 
+ * @author Mon <985558837@qq.com>
+ * @version 1.0.0
  */
 class HttpHook extends Hook
 {

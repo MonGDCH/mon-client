@@ -9,6 +9,7 @@ use mon\client\exception\HttpException;
  * HTTP请求异步并发类
  * 支持多个HTTP请求并发请求，请求结束则执行异步回调
  * 
+ * @author Mon <985558837@qq.com>
  * @version 1.0.0
  */
 class HttpMulti

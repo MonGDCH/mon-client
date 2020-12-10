@@ -6,6 +6,9 @@ use mon\client\hook\Hook;
 
 /**
  * TCP业务钩子
+ * 
+ * @author Mon <985558837@qq.com>
+ * @version 1.0.0
  */
 class TcpHook extends Hook
 {

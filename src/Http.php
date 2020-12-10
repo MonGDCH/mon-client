@@ -9,7 +9,9 @@ use mon\client\exception\HttpException;
  * HTTP请求类
  * 单个HTTP请求发起，IO阻塞
  * 
+ * @author Mon <985558837@qq.com>
  * @version 2.0.0   支持GET、POST、PUT、DELETE请求类型
+ * @version 3.0.0   支持设置请求头
  */
 class Http
 {

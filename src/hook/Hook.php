@@ -7,6 +7,9 @@ use mon\factory\Container;
 
 /**
  * 业务钩子基类
+ * 
+ * @author Mon <985558837@qq.com>
+ * @version 1.0.0
  */
 class Hook
 {
