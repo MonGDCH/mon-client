@@ -2,6 +2,7 @@
 
 namespace mon\client;
 
+use mon\util\Instance;
 use mon\client\hook\TcpHook;
 use mon\client\exception\TcpException;
 
@@ -13,12 +14,7 @@ use mon\client\exception\TcpException;
  */
 class Tcp
 {
-    /**
-     * 单例实体
-     *
-     * @var null
-     */
-    protected static $instance = null;
+    use Instance;
 
     /**
      * 配置信息
@@ -33,21 +29,6 @@ class Tcp
      * @var array
      */
     protected $requestCache = [];
-
-    /**
-     * 单例实现
-     *
-     * @param array $config 配置信息
-     * @return Tcp
-     */
-    public static function instance(array $config = [])
-    {
-        if (is_null(self::$instance)) {
-            self::$instance = new static($config);
-        }
-
-        return self::$instance;
-    }
 
     /**
      * 私有化构造方法
@@ -85,7 +66,7 @@ class Tcp
      * @param   boolean $close      是否关闭链接
      * @param   boolean $cache      是否读取缓存数据
      * @param   integer $cacheTime  缓存数据有效时间
-     * @return  $result;
+     * @return  mixed 结果集
      */
     public function sendCMD($serverName, $cmd, $timeOut = 2, $toJson = false, $close = true, $cache = false, $cacheTime = 60)
     {

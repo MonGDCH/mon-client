@@ -2,7 +2,8 @@
 
 namespace mon\client;
 
-use mon\client\hook\HttpHook;
+use mon\util\Instance;
+use mon\util\Container;
 use mon\client\exception\HttpException;
 
 /**
@@ -10,30 +11,29 @@ use mon\client\exception\HttpException;
  * 支持多个HTTP请求并发请求，请求结束则执行异步回调
  * 
  * @author Mon <985558837@qq.com>
- * @version 1.0.0
+ * @version 1.1.0   优化代码，增加业务钩子
  */
 class HttpMulti
 {
-    /**
-     * 单例实体
-     *
-     * @var null
-     */
-    protected static $instance = null;
+    use Instance;
 
     /**
      * 配置信息
      *
      * @var array
      */
-    protected $config = [];
-
-    /**
-     * 缓存已请求的server配置
-     *
-     * @var array
-     */
-    protected $requestCache = [];
+    protected $config = [
+        // 默认最大滚动窗口数
+        'rolling'   => 5,
+        // 默认请求类型
+        'method'    => 'GET',
+        // 默认超时时间
+        'timeout'   => 2,
+        // 默认请求头
+        'header'    => [],
+        // 默认user-agent
+        'agent'     => 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36',
+    ];
 
     /**
      * 私有化构造方法
@@ -42,22 +42,17 @@ class HttpMulti
      */
     protected function __construct(array $config = [])
     {
-        $this->config = $config;
+        $this->config = array_merge($this->config, $config);
     }
 
     /**
-     * 单例实现
+     * 获取配置信息
      *
-     * @param array $config 配置信息
-     * @return HttpMulti
+     * @return array
      */
-    public static function instance(array $config = [])
+    public function getConfig()
     {
-        if (is_null(self::$instance)) {
-            self::$instance = new static($config);
-        }
-
-        return self::$instance;
+        return $this->config;
     }
 
     /**
@@ -99,14 +94,16 @@ class HttpMulti
      * 生成curl句柄
      * 
      * @param array $queryList 请求列表
-     * @return mixed
+     * @return array 成功结果集与失败结果集
      */
     public function sendMultiQuery(array $queryList)
     {
         $result = [];
+        $errors = [];
+        $curls = [];
         $master = curl_multi_init();
         // 确保滚动窗口不大于网址数量
-        $rolling = 5;
+        $rolling = $this->config['rolling'];
         $rolling = (count($queryList) < $rolling) ? count($queryList) : $rolling;
         for ($i = 0; $i < $rolling; $i++) {
             $item = $queryList[$i];
@@ -114,8 +111,13 @@ class HttpMulti
             $ch = $this->getCh($item);
             // 写入批量请求
             curl_multi_add_handle($master, $ch);
+            // 记录队列
+            $key = (string)$ch;
+            $curls[$key] = [
+                'index' => $i,
+                'data'  => $item,
+            ];
         }
-
         // 发起请求
         do {
             while (($execrun = curl_multi_exec($master, $running)) == CURLM_CALL_MULTI_PERFORM);
@@ -126,36 +128,53 @@ class HttpMulti
             while ($done = curl_multi_info_read($master)) {
                 // 获取请求信息
                 $info = curl_getinfo($done['handle']);
-
+                // 请求成功
                 if ($info['http_code'] == 200) {
                     // 获取返回内容
                     $output = curl_multi_getcontent($done['handle']);
-
-                    $result[] = $output;
-                    // 请求成功，执行回调函数
-                    // $callback($output);
-
-                    // 发起新请求（在删除旧请求之前，请务必先执行此操作）, 当$i等于$urls数组大小时不用再增加了
-                    if ($i < count($queryList)) {
-                        $ch = $this->getCh($queryList[$i++]);
-                        curl_multi_add_handle($master, $ch);
+                    // 请求成功，存在回调函数，执行回调函数
+                    $key = (string) $done['handle'];
+                    // debug($key);
+                    if (isset($curls[$key]) && isset($curls[$key]['data']['callback']) && !empty($curls[$key]['data']['callback'])) {
+                        $output = Container::instance()->invoke($curls[$key]['data']['callback'], [$output, $curls[$key], $done['handle']]);
                     }
-                    // 执行下一个句柄
-                    curl_multi_remove_handle($master, $done['handle']);
+                    $result[] = $output;
                 } else {
                     // 请求失败，执行错误处理
+                    $key = (string) $done['handle'];
+                    $errors[] = [
+                        'ch'    => $done['handle'],
+                        'item'  => $curls[$key]
+                    ];
                 }
+
+                // 发起新请求（在删除旧请求之前，请务必先执行此操作）, 当$i等于$urls数组大小时不用再增加了
+                if ($i < count($queryList)) {
+                    $ch = $this->getCh($queryList[$i++]);
+                    curl_multi_add_handle($master, $ch);
+                    // 记录队列
+                    $key = (string)$ch;
+                    $curls[$key] = [
+                        'index' => $i,
+                        'data'  => $item,
+                    ];
+                }
+                // 执行下一个句柄
+                curl_multi_remove_handle($master, $done['handle']);
             }
         } while ($running);
 
-        return $result;
+        return [
+            'success'   => $result,
+            'error'     => $errors
+        ];
     }
 
     /**
      * 解析请求列表项，获取curl
      *
-     * @param array $item 请求配置
-     * @return mixed
+     * @param array $item 请求配置信息
+     * @return resource cURL句柄
      */
     protected function getCh(array $item)
     {
@@ -165,7 +184,7 @@ class HttpMulti
         }
         $url = $item['url'];
         // 请求方式，默认使用get请求
-        $method = (isset($item['method']) && !empty($item['method'])) ? strtoupper($item['method']) : 'GET';
+        $method = (isset($item['method']) && !empty($item['method'])) ? strtoupper($item['method']) : $this->config['method'];
         // 请求数据
         $data = [];
         if (isset($item['data']) && !empty($item['data'])) {
@@ -177,9 +196,9 @@ class HttpMulti
             }
         }
         // 超时时间，默认2s
-        $timeOut = (isset($item['timeout']) && is_numeric($item['timeout'])) ? $item['timeout'] : 2;
+        $timeOut = (isset($item['timeout']) && is_numeric($item['timeout'])) ? $item['timeout'] : $this->config['timeout'];
         // 请求头
-        $header = (isset($item['header']) && !empty($item['header'])) ? $item['header'] : [];
+        $header = (isset($item['header']) && !empty($item['header'])) ? $item['header'] : $this->config['header'];
         // 获取curl请求
         $ch = $this->getRequest($url, $data, $method, $timeOut, $header);
 
@@ -194,7 +213,7 @@ class HttpMulti
      * @param  string  $type    请求方式
      * @param  integer $timeOut 超时时间
      * @param  array   $header  请求头
-     * @return mixed
+     * @return resource cURL句柄
      */
     protected function getRequest($url, $data = [], $type = 'GET', $timeOut = 2, array $header = [])
     {
@@ -206,17 +225,20 @@ class HttpMulti
 
         // 判断请求类型
         switch ($type) {
-            case "GET":
+            case 'GET':
                 curl_setopt($ch, CURLOPT_HTTPGET, true);
                 break;
-            case "POST":
+            case 'POST':
                 curl_setopt($ch, CURLOPT_POST, true);
                 break;
-            case "PUT":
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+            case 'PUT':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
                 break;
-            case "DELETE":
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+            case 'DELETE':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+                break;
+            case 'PATCH':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
                 break;
             default:
                 return $this->errorQuit('[' . __METHOD__ . ']不支持的请求类型(' . $type . ')');
@@ -237,7 +259,7 @@ class HttpMulti
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_MAXREDIRS, 6);
         // 设置user-agent
-        $userAgent = (isset($_SERVER['HTTP_USER_AGENT']) && !empty($_SERVER['HTTP_USER_AGENT'])) ? $_SERVER['HTTP_USER_AGENT'] : "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36";
+        $userAgent = (isset($_SERVER['HTTP_USER_AGENT']) && !empty($_SERVER['HTTP_USER_AGENT'])) ? $_SERVER['HTTP_USER_AGENT'] : $this->config['agent'];
         curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
         // 设置请求头
         if (!empty($header)) {

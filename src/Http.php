@@ -2,6 +2,7 @@
 
 namespace mon\client;
 
+use mon\util\Instance;
 use mon\client\hook\HttpHook;
 use mon\client\exception\HttpException;
 
@@ -12,15 +13,11 @@ use mon\client\exception\HttpException;
  * @author Mon <985558837@qq.com>
  * @version 2.0.0   支持GET、POST、PUT、DELETE请求类型
  * @version 3.0.0   支持设置请求头
+ * @version 3.0.1   增加patch请求方式
  */
 class Http
 {
-    /**
-     * 单例实体
-     *
-     * @var null
-     */
-    protected static $instance = null;
+    use Instance;
 
     /**
      * 配置信息
@@ -37,28 +34,24 @@ class Http
     protected $requestCache = [];
 
     /**
-     * 单例实现
+     * 默认用户user-agent
      *
-     * @param array $config 配置信息
-     * @return Http
+     * @var string
      */
-    public static function instance(array $config = [])
-    {
-        if (is_null(self::$instance)) {
-            self::$instance = new static($config);
-        }
-
-        return self::$instance;
-    }
+    protected $userAgent = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36';
 
     /**
      * 私有化构造方法
      *
      * @param array $config 配置信息
+     * @param string $userAgent 用户请求userAgent
      */
-    protected function __construct(array $config = [])
+    protected function __construct(array $config = [], $userAgent = '')
     {
         $this->config = $config;
+        if (!empty($userAgent)) {
+            $this->userAgent = $userAgent;
+        }
     }
 
     /**
@@ -72,7 +65,7 @@ class Http
      * @param   array   $header  请求头
      * @return  mixed 结果集
      */
-    public function sendUrl($url, array $data = [], $type = 'GET', $toJson = false, $timeOut = 2, array $header = [])
+    public function sendURL($url, array $data = [], $type = 'GET', $toJson = false, $timeOut = 2, array $header = [])
     {
         $method = strtoupper($type);
         $queryData = $data;
@@ -238,17 +231,20 @@ class Http
 
         // 判断请求类型
         switch ($type) {
-            case "GET":
+            case 'GET':
                 curl_setopt($ch, CURLOPT_HTTPGET, true);
                 break;
-            case "POST":
+            case 'POST':
                 curl_setopt($ch, CURLOPT_POST, true);
                 break;
-            case "PUT":
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+            case 'PUT':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
                 break;
-            case "DELETE":
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+            case 'DELETE':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+                break;
+            case 'PATCH':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
                 break;
             default:
                 return $this->errorQuit('[' . __METHOD__ . ']不支持的请求类型(' . $type . ')');
@@ -269,7 +265,7 @@ class Http
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_MAXREDIRS, 6);
         // 设置user-agent
-        $userAgent = (isset($_SERVER['HTTP_USER_AGENT']) && !empty($_SERVER['HTTP_USER_AGENT'])) ? $_SERVER['HTTP_USER_AGENT'] : "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36";
+        $userAgent = (isset($_SERVER['HTTP_USER_AGENT']) && !empty($_SERVER['HTTP_USER_AGENT'])) ? $_SERVER['HTTP_USER_AGENT'] : $this->userAgent;
         curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
         // 设置请求头
         if (!empty($header)) {

@@ -12,13 +12,14 @@ class Hook
 {
     public function handler($res)
     {
-        var_dump('class', $res);
+        // echo 'class';
+        // debug($res);
     }
 }
 
 // 注册钩子，匿名函数回调
 HttpHook::add('send_befor', function ($res) {
-    var_dump($res);
+    // debug($res);
 });
 
 // 注册构造，类方法回调
@@ -28,6 +29,7 @@ HttpHook::add('send_after', Hook::class);
 HttpHook::add('send_faild', Hook::class);
 HttpHook::add('result_return', Hook::class);
 
-$res = Http::instance()->sendUrl('http://domain.com/admin/passport/login', ['a' => '123']);
+// $result = Http::instance()->sendURL('http://domain.com/admin/passport/login', ['a' => '123']);
+$result = Http::instance()->sendURL('http://localhost/index2.php', ['a' => '123'], 'put');
 
-var_dump($res);
+debug($result);

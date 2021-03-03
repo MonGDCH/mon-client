@@ -2,6 +2,7 @@
 
 namespace mon\client;
 
+use mon\util\Instance;
 use mon\client\hook\UdpHook;
 use mon\client\exception\UdpException;
 
@@ -13,12 +14,7 @@ use mon\client\exception\UdpException;
  */
 class Udp
 {
-    /**
-     * 单例实体
-     *
-     * @var null
-     */
-    protected static $instance = null;
+    use Instance;
 
     /**
      * 配置信息
@@ -33,21 +29,6 @@ class Udp
      * @var array
      */
     protected $requestCache = [];
-
-    /**
-     * 单例实现
-     *
-     * @param array $config 配置信息
-     * @return Udp
-     */
-    public static function instance(array $config = [])
-    {
-        if (is_null(self::$instance)) {
-            self::$instance = new static($config);
-        }
-
-        return self::$instance;
-    }
 
     /**
      * 私有化构造方法

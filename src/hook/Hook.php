@@ -3,7 +3,7 @@
 namespace mon\client\hook;
 
 use Closure;
-use mon\factory\Container;
+use mon\util\Container;
 
 /**
  * 业务钩子基类
@@ -44,7 +44,7 @@ class Hook
     public static function get($tag = '')
     {
         if (empty($tag)) {
-            //获取全部的插件信息
+            // 获取全部的插件信息
             return static::$tags;
         } else {
             return array_key_exists($tag, static::$tags) ? static::$tags[$tag] : [];
