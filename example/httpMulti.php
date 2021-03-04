@@ -58,9 +58,9 @@ $query = [
         'header'    => [],
     ],
     [
-        'url'       => 'http://localhost/index7.php',
-        'data'      => [],
-        'method'    => 'get',
+        'url'       => 'http://localhost/index2.php',
+        'data'      => ['test' => '123456'],
+        'method'    => 'patch',
         'timeout'   => 2,
         'header'    => [],
     ],

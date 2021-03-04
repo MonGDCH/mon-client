@@ -4,6 +4,10 @@ PHP基于CURL的HTTP、TCP、UDP客户端工具库，支持HTTP异步批量并�
 
 ### 版本
 
+#### 3.0.2
+
+* 修正PUT、DELETE、PATCH请求传参转换为json格式
+
 #### 3.0.1
 
 * 优化代码，增强注解

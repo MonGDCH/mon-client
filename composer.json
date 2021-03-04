@@ -1,7 +1,7 @@
 {
     "name": "mongdch/mon-client",
     "description": "PHP网络请求客户端，支持HTTP、TCP、UDP、异步并发HTTP，支持业务钩子",
-    "version": "3.0.1",
+    "version": "3.0.2",
     "keywords": [
         "HTTP",
         "HTTPS",

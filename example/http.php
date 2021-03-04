@@ -30,6 +30,25 @@ HttpHook::add('send_faild', Hook::class);
 HttpHook::add('result_return', Hook::class);
 
 // $result = Http::instance()->sendURL('http://domain.com/admin/passport/login', ['a' => '123']);
-$result = Http::instance()->sendURL('http://localhost/index2.php', ['a' => '123'], 'put');
+$result = Http::instance()->sendURL('http://localhost/index2.php', ['test' => '111'], 'patch');
+
+
+function puturl($url, $data)
+{
+    $data = json_encode($data);
+    $ch = curl_init(); //初始化CURL句柄 
+    curl_setopt($ch, CURLOPT_URL, $url); //设置请求的URL
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-type:application/json'));
+    // curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-type:application/x-www-form-urlencoded;'));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); //设为TRUE把curl_exec()结果转化为字串，而不是直接输出 
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT"); //设置请求方式
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data); //设置提交的字符串
+    $output = curl_exec($ch);
+    curl_close($ch);
+    return $output;
+    // return json_decode($output, true);
+}
+
+// $result = puturl('http://localhost/index2.php', ['a' => 2]);
 
 debug($result);

@@ -232,13 +232,11 @@ class HttpMulti
                 curl_setopt($ch, CURLOPT_POST, true);
                 break;
             case 'PUT':
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-                break;
             case 'DELETE':
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-                break;
             case 'PATCH':
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
+                $data = empty($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE);
+                $header[] = 'Content-Type:application/json';
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $type);
                 break;
             default:
                 return $this->errorQuit('[' . __METHOD__ . ']不支持的请求类型(' . $type . ')');
